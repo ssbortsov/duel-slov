@@ -202,7 +202,7 @@ const VOW = new Set(['а','е','и','о','у','ы','э','ю','я']);
 /* ---------- состояние ---------- */
 let board=[], sel=[], turn='you', played=new Set(), passes=0, busy=false;
 let timerId=null, timeLeft=50;
-let botTimerId=null, botTimeLeft=0;
+let botTimerId=null, botThinkId=null, botVisualLeft=0;
 const TURN_SEC=50;
 const $=id=>document.getElementById(id);
 const neighbors=i=>{const r=(i/COLS)|0,c=i%COLS,o=[];if(r>0)o.push(i-COLS);if(r<ROWS-1)o.push(i+COLS);if(c>0)o.push(i-1);if(c<COLS-1)o.push(i+1);return o;};
@@ -302,7 +302,9 @@ function startTimer(){
 }
 function clearTimer(){
   if(timerId){clearInterval(timerId);timerId=null;}
-  if(botTimerId){clearInterval(botTimerId);botTimerId=null;botTimeLeft=0;}
+  if(botTimerId){clearInterval(botTimerId);botTimerId=null;}
+  if(botThinkId){clearTimeout(botThinkId);botThinkId=null;}
+  botVisualLeft=0;
 }
 function updateTimer(){
   const pct=(timeLeft/TURN_SEC)*100;
@@ -319,35 +321,38 @@ function updateTimer(){
 }
 
 function startBotTimer(mv){
-  botTimerId=null;
-  const thinkSec=10+Math.floor(Math.random()*21);
-  botTimeLeft=thinkSec;
+  // Визуальный таймер: те же 50с, что у игрока, розовый цвет
+  botVisualLeft=TURN_SEC;
   updateBotTimer();
   botTimerId=setInterval(()=>{
-    botTimeLeft--;
+    botVisualLeft--;
     updateBotTimer();
-    if(botTimeLeft<=0){
-      clearInterval(botTimerId);botTimerId=null;
-      if(mv){
-        const before=board.filter(t=>t.owner==='bot').length;
-        applyWord('bot',mv.tiles,mv.word);
-        const gain=board.filter(t=>t.owner==='bot').length-before;
-        renderWordLog('bot',mv.word,Math.max(gain,0));passes=0;
-      } else {passes++;}
-      busy=false;
-      if(checkEnd()){render();return;}
-      turn='you';setMsg('');render();startTimer();
-    }
+    if(botVisualLeft<=0){clearInterval(botTimerId);botTimerId=null;}
   },1000);
+  // Фоновый таймер: случайно 10–40с, по нему бот делает ход
+  const thinkMs=(10+Math.floor(Math.random()*31))*1000;
+  botThinkId=setTimeout(()=>{
+    botThinkId=null;
+    clearInterval(botTimerId);botTimerId=null;
+    if(mv){
+      const before=board.filter(t=>t.owner==='bot').length;
+      applyWord('bot',mv.tiles,mv.word);
+      const gain=board.filter(t=>t.owner==='bot').length-before;
+      renderWordLog('bot',mv.word,Math.max(gain,0));passes=0;
+    } else {passes++;}
+    busy=false;
+    if(checkEnd()){render();return;}
+    turn='you';setMsg('');render();startTimer();
+  },thinkMs);
 }
 function updateBotTimer(){
   const fill=$('timerFill');
   const bar=$('timerbar');
   const tp=$('turnPill');
-  const pct=botTimeLeft>0?(botTimeLeft/50)*100:0;
+  const pct=(botVisualLeft/TURN_SEC)*100;
   if(fill){fill.style.width=pct+'%';fill.style.background='var(--bot-hi)';}
   if(bar){bar.className='timerbar';}
-  if(tp){tp.textContent=`Соперник думает · ${botTimeLeft}с`;tp.className='turnpill';}
+  if(tp){tp.textContent=`Соперник думает · ${botVisualLeft}с`;tp.className='turnpill';}
 }
 
 /* ---------- отрисовка ---------- */
@@ -371,7 +376,7 @@ function render(){
   $('acceptBtn').disabled=!(word.length>=2&&turn==='you'&&!busy);
   const tp=$('turnPill');
   if(turn==='you'){tp.textContent=`Ваш ход · ${timeLeft}с`;tp.className='turnpill you'+(timeLeft<=10?' urgent':'');}
-  else{tp.textContent=botTimeLeft>0?`Соперник думает · ${botTimeLeft}с`:'Соперник ищет слово…';tp.className='turnpill';}
+  else{tp.textContent=botVisualLeft>0?`Соперник думает · ${botVisualLeft}с`:'Соперник ищет слово…';tp.className='turnpill';}
   $('levelLine').textContent=`Уровень ${level}`;
   $('botName').textContent=botTitle(level);
   $('botAva').textContent=botAvaChar(level);
