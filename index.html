@@ -440,7 +440,11 @@ function endTurnTo(who){
 
 function checkEnd(){
   const full=board.every(t=>t.owner!==null);
-  if(full||passes>=2){
+  // Fallback: оба игрока застряли — нет ходов с захватом ни у кого
+  const stuck=passes>=4
+    &&allMoves('you').filter(m=>m.gain>0).length===0
+    &&allMoves('bot').filter(m=>m.gain>0).length===0;
+  if(full||stuck){
     clearTimer();
     const you=board.filter(t=>t.owner==='you').length;
     const bot=board.filter(t=>t.owner==='bot').length;
