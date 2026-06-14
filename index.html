@@ -106,7 +106,7 @@
 </head>
 <body>
 <div class="app">
-  <div class="topline">Закрасьте больше клеток, чем соперник</div>
+  <div class="topline" id="levelLine">Уровень 1</div>
 
   <div class="players">
     <div class="pl you">
@@ -117,8 +117,8 @@
     </div>
     <div class="turnpill" id="turnPill">Ваш ход</div>
     <div class="pl bot">
-      <div class="ava">😈</div>
-      <div class="pname">Соперник</div>
+      <div class="ava" id="botAva">🤖</div>
+      <div class="pname" id="botName">Новичок</div>
       <div class="pscore" id="botScore">0</div>
       <div class="words" id="botWords"></div>
     </div>
@@ -136,7 +136,7 @@
   </div>
   <div class="subbar">
     <button class="linkbtn" id="passBtn">Пропустить ход</button>
-    <button class="linkbtn" id="newBtn">Новая партия</button>
+    <button class="linkbtn" id="resetBtn">Сбросить уровень</button>
   </div>
 </div>
 
@@ -152,12 +152,43 @@
 const tg = window.Telegram && window.Telegram.WebApp;
 if (tg){ try{ tg.ready(); tg.expand(); }catch(e){} }
 
-/* ---------- словарь (загружается из words_ru.txt) ---------- */
+/* ---------- словарь ---------- */
 let DICT = new Set();
+
+/* ---------- прогрессия ---------- */
+let level = parseInt(localStorage.getItem('duel_level') || '1');
+
+function botTopN(lvl) {
+  if (lvl >= 15) return 1;
+  if (lvl >= 10) return 2;
+  if (lvl >= 7)  return 4;
+  if (lvl >= 5)  return 7;
+  if (lvl >= 3)  return 12;
+  return 999;
+}
+function botBonusTiles(lvl) {
+  return lvl > 20 ? Math.min(Math.floor((lvl - 20) / 5), 6) : 0;
+}
+function botTitle(lvl) {
+  if (lvl >= 21) return 'Легенда';
+  if (lvl >= 16) return 'Гроссмейстер';
+  if (lvl >= 11) return 'Мастер';
+  if (lvl >= 7)  return 'Знаток';
+  if (lvl >= 4)  return 'Любитель';
+  return 'Новичок';
+}
+function botAvaChar(lvl) {
+  if (lvl >= 21) return '🔥';
+  if (lvl >= 16) return '👑';
+  if (lvl >= 11) return '😎';
+  if (lvl >= 7)  return '🧠';
+  if (lvl >= 4)  return '😐';
+  return '🤖';
+}
 
 /* ---------- конфиг поля ---------- */
 const COLS=5, ROWS=4, N=COLS*ROWS;
-const BAG = (()=>{ // частотно-взвешенный мешок
+const BAG = (()=>{
   const w={о:11,е:10,а:8,и:7,н:7,т:6,с:6,р:6,в:5,л:5,к:5,п:4,м:4,д:4,у:4,я:2,г:2,з:2,б:2,й:2,х:2,ж:1,ш:1,ц:1,ч:2,ь:2,ы:2,э:1,ф:1,ю:1};
   const arr=[]; for(const k in w){ for(let i=0;i<w[k];i++) arr.push(k);} return arr;
 })();
@@ -166,179 +197,202 @@ const VOW = new Set(['а','е','и','о','у','ы','э','ю','я']);
 /* ---------- состояние ---------- */
 let board=[], sel=[], turn='you', played=new Set(), passes=0, busy=false;
 const $=id=>document.getElementById(id);
-const idx=(r,c)=>r*COLS+c;
 const neighbors=i=>{const r=(i/COLS)|0,c=i%COLS,o=[];if(r>0)o.push(i-COLS);if(r<ROWS-1)o.push(i+COLS);if(c>0)o.push(i-1);if(c<COLS-1)o.push(i+1);return o;};
 
 function letterMultiset(arr){const m={};for(const ch of arr)m[ch]=(m[ch]||0)+1;return m;}
-function formable(word, counts){const need={};for(const ch of word){need[ch]=(need[ch]||0)+1;if((need[ch])>(counts[ch]||0))return false;}return true;}
+function formable(word,counts){const need={};for(const ch of word){need[ch]=(need[ch]||0)+1;if((need[ch])>(counts[ch]||0))return false;}return true;}
 
 function newBoard(){
-  for(let tries=0; tries<60; tries++){
+  for(let tries=0;tries<60;tries++){
     const b=[];
-    for(let i=0;i<N;i++) b.push({ch:BAG[(Math.random()*BAG.length)|0], owner:null});
+    for(let i=0;i<N;i++) b.push({ch:BAG[(Math.random()*BAG.length)|0],owner:null});
     const vowels=b.filter(t=>VOW.has(t.ch)).length;
     if(vowels<6||vowels>11) continue;
     const counts=letterMultiset(b.map(t=>t.ch));
-    let ok=0; for(const w of DICT){ if(formable(w,counts)){ok++; if(ok>=14)break;} }
+    let ok=0; for(const w of DICT){if(formable(w,counts)){ok++;if(ok>=14)break;}}
     if(ok>=14) return b;
   }
   return Array.from({length:N},()=>({ch:BAG[(Math.random()*BAG.length)|0],owner:null}));
 }
 
-/* блокировка: клетка защищена, если все её соседи того же владельца */
 function lockedSet(b){
   const s=new Set();
-  for(let i=0;i<N;i++){ const o=b[i].owner; if(!o) continue;
-    if(neighbors(i).every(j=>b[j].owner===o)) s.add(i); }
+  for(let i=0;i<N;i++){const o=b[i].owner;if(!o)continue;
+    if(neighbors(i).every(j=>b[j].owner===o))s.add(i);}
   return s;
 }
 
-/* правило Letterpress: слово не игралось и не начинается с уже сыгранного */
 function wordAllowed(w){
   if(played.has(w)) return false;
-  for(const p of played){ if(w.length>p.length && w.startsWith(p)) return false; }
+  for(const p of played){if(w.length>p.length&&w.startsWith(p))return false;}
   return true;
 }
 
-/* применить слово игрока player, используя конкретные клетки tiles[] */
-function applyWord(player, tiles, word){
+function applyWord(player,tiles,word){
   const locks=lockedSet(board);
   for(const i of tiles){
     if(board[i].owner===player) continue;
-    if(board[i].owner && locks.has(i)) continue; // защищённую чужую не отнять
+    if(board[i].owner&&locks.has(i)) continue;
     board[i].owner=player;
   }
   played.add(word);
 }
 
 /* ---------- бот ---------- */
-function bestMove(player){
-  const counts=letterMultiset(board.map(t=>t.ch));
-  const locks=lockedSet(board);
-  let best=null;
-  for(const w of DICT){
-    if(!wordAllowed(w)||!formable(w,counts)) continue;
-    // подобрать клетки под слово, максимизируя выгоду
-    const used=new Set(); let tiles=[], gain=0, steal=0, okWord=true;
-    const need=letterMultiset(w);
-    for(const ch in need){
-      // кандидаты этой буквы, отсортированы по выгоде флипа
-      const cand=[];
-      for(let i=0;i<N;i++){ if(board[i].ch===ch&&!used.has(i)) cand.push(i); }
-      cand.sort((a,b)=>flipVal(b,player,locks)-flipVal(a,player,locks));
-      if(cand.length<need[ch]){ okWord=false; break; }
-      for(let k=0;k<need[ch];k++){ const i=cand[k]; used.add(i); tiles.push(i);
-        const o=board[i].owner;
-        if(o!==player && !(o&&locks.has(i))){ gain++; if(o&&o!==player) steal++; } }
-    }
-    if(!okWord) continue;
-    const score=gain*10 + steal*4 + w.length; // выгода, отъём, длина
-    if(!best||score>best.score) best={word:w,tiles,score,gain};
-  }
-  return (best && best.gain>0) ? best : null;
-}
 function flipVal(i,player,locks){
   const o=board[i].owner;
   if(o===player) return 0;
-  if(o && locks.has(i)) return 0;     // не отнять
-  if(o) return 3;                      // отнять чужую
-  return 2;                            // закрасить пустую
+  if(o&&locks.has(i)) return 0;
+  if(o) return 3;
+  return 2;
+}
+
+function allMoves(player){
+  const counts=letterMultiset(board.map(t=>t.ch));
+  const locks=lockedSet(board);
+  const moves=[];
+  for(const w of DICT){
+    if(!wordAllowed(w)||!formable(w,counts)) continue;
+    const used=new Set();let tiles=[],gain=0,steal=0,okWord=true;
+    const need=letterMultiset(w);
+    for(const ch in need){
+      const cand=[];
+      for(let i=0;i<N;i++){if(board[i].ch===ch&&!used.has(i))cand.push(i);}
+      cand.sort((a,b)=>flipVal(b,player,locks)-flipVal(a,player,locks));
+      if(cand.length<need[ch]){okWord=false;break;}
+      for(let k=0;k<need[ch];k++){const i=cand[k];used.add(i);tiles.push(i);
+        const o=board[i].owner;
+        if(o!==player&&!(o&&locks.has(i))){gain++;if(o&&o!==player)steal++;}}
+    }
+    if(!okWord) continue;
+    moves.push({word:w,tiles,score:gain*10+steal*4+w.length,gain});
+  }
+  moves.sort((a,b)=>b.score-a.score);
+  return moves;
+}
+
+function bestMove(player){
+  const moves=allMoves(player).filter(m=>m.gain>0);
+  if(!moves.length) return null;
+  if(player==='bot'){
+    const topN=Math.min(botTopN(level),moves.length);
+    return moves[(Math.random()*topN)|0];
+  }
+  return moves[0];
 }
 
 /* ---------- отрисовка ---------- */
 function render(){
-  const b=$('board'); b.style.gridTemplateColumns=`repeat(${COLS}, var(--tile))`;
-  const locks=lockedSet(board); b.innerHTML='';
+  const b=$('board');b.style.gridTemplateColumns=`repeat(${COLS},var(--tile))`;
+  const locks=lockedSet(board);b.innerHTML='';
   board.forEach((t,i)=>{
     const el=document.createElement('button');
     el.className='tile'+(t.owner?(' '+t.owner):'')+(locks.has(i)?' lock':'');
     const k=sel.indexOf(i);
-    if(k>-1){ el.classList.add('sel'); const o=document.createElement('span'); o.className='ord'; o.textContent=k+1; el.appendChild(o); }
+    if(k>-1){el.classList.add('sel');const o=document.createElement('span');o.className='ord';o.textContent=k+1;el.appendChild(o);}
     el.appendChild(document.createTextNode(t.ch.toUpperCase()));
     el.onclick=()=>tapTile(i);
     b.appendChild(el);
   });
   const you=board.filter(t=>t.owner==='you').length;
   const bot=board.filter(t=>t.owner==='bot').length;
-  $('youScore').textContent=you; $('botScore').textContent=bot;
+  $('youScore').textContent=you;$('botScore').textContent=bot;
   const word=sel.map(i=>board[i].ch).join('');
-  $('cur').innerHTML = word ? word.toUpperCase().split('').join('') : '<span class="ph">— —</span>';
-  $('acceptBtn').disabled = !(word.length>=2 && turn==='you' && !busy);
+  $('cur').innerHTML=word?word.toUpperCase().split('').join(''):'<span class="ph">— —</span>';
+  $('acceptBtn').disabled=!(word.length>=2&&turn==='you'&&!busy);
   const tp=$('turnPill');
-  if(turn==='you'){ tp.textContent='Ваш ход'; tp.className='turnpill you'; }
-  else { tp.textContent='Соперник ищет слово…'; tp.className='turnpill'; }
+  if(turn==='you'){tp.textContent='Ваш ход';tp.className='turnpill you';}
+  else{tp.textContent='Соперник ищет слово…';tp.className='turnpill';}
+  $('levelLine').textContent=`Уровень ${level}`;
+  $('botName').textContent=botTitle(level);
+  $('botAva').textContent=botAvaChar(level);
 }
-function setMsg(t,cls=''){ const m=$('msg'); m.textContent=t; m.className='msg '+cls; }
 
-function renderWordLog(player, word, gain){
+function setMsg(t,cls=''){const m=$('msg');m.textContent=t;m.className='msg '+cls;}
+
+function renderWordLog(player,word,gain){
   const box=$(player==='you'?'youWords':'botWords');
-  const row=document.createElement('div'); row.className='wrow';
+  const row=document.createElement('div');row.className='wrow';
   row.innerHTML=`<span>${word.toUpperCase()}</span><b>+${gain}</b>`;
-  box.prepend(row); while(box.children.length>3) box.removeChild(box.lastChild);
+  box.prepend(row);while(box.children.length>3)box.removeChild(box.lastChild);
 }
 
 /* ---------- ввод ---------- */
 function tapTile(i){
   if(turn!=='you'||busy) return;
   const k=sel.indexOf(i);
-  if(k>-1){ sel=sel.slice(0,k); }      // тап по выбранной — откат до неё
-  else sel.push(i);
-  setMsg(''); render();
+  if(k>-1){sel=sel.slice(0,k);}else sel.push(i);
+  setMsg('');render();
 }
-function clearSel(){ sel=[]; setMsg(''); render(); }
+function clearSel(){sel=[];setMsg('');render();}
 
 function youAccept(){
   if(turn!=='you'||busy) return;
   const word=sel.map(i=>board[i].ch).join('');
-  if(word.length<2){ return; }
-  if(!DICT.has(word)){ setMsg('Нет в словаре','bad'); shake(); return; }
-  if(!wordAllowed(word)){ setMsg('Слово уже было','bad'); shake(); return; }
+  if(word.length<2) return;
+  if(!DICT.has(word)){setMsg('Нет в словаре','bad');shake();return;}
+  if(!wordAllowed(word)){setMsg('Слово уже было','bad');shake();return;}
   const before=board.filter(t=>t.owner==='you').length;
-  applyWord('you', sel.slice(), word);
+  applyWord('you',sel.slice(),word);
   const gain=board.filter(t=>t.owner==='you').length-before;
   renderWordLog('you',word,Math.max(gain,0));
-  passes=0; sel=[];
+  passes=0;sel=[];
   setMsg('Слово принято','good');
   endTurnTo('bot');
 }
 
 function pass(){
   if(turn!=='you'||busy) return;
-  sel=[]; passes++; setMsg('Ход пропущен');
+  sel=[];passes++;setMsg('Ход пропущен');
   if(checkEnd()) return;
   endTurnTo('bot');
 }
 
-function shake(){ const c=$('cur'); c.animate([{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}],{duration:160}); }
+function shake(){const c=$('cur');c.animate([{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}],{duration:160});}
 
 /* ---------- ход бота ---------- */
 function endTurnTo(who){
-  turn=who; render();
+  turn=who;render();
   if(who==='bot'){
     busy=true;
     setTimeout(()=>{
       const mv=bestMove('bot');
       if(mv){
         const before=board.filter(t=>t.owner==='bot').length;
-        applyWord('bot', mv.tiles, mv.word);
+        applyWord('bot',mv.tiles,mv.word);
         const gain=board.filter(t=>t.owner==='bot').length-before;
-        renderWordLog('bot',mv.word,Math.max(gain,0)); passes=0;
-      } else { passes++; }
+        renderWordLog('bot',mv.word,Math.max(gain,0));passes=0;
+      } else {passes++;}
       busy=false;
-      if(checkEnd()){ render(); return; }
-      turn='you'; setMsg(''); render();
-    }, 650);
+      if(checkEnd()){render();return;}
+      turn='you';setMsg('');render();
+    },650);
   }
 }
 
 function checkEnd(){
-  const full = board.every(t=>t.owner!==null);
-  if(full || passes>=2){
+  const full=board.every(t=>t.owner!==null);
+  if(full||passes>=2){
     const you=board.filter(t=>t.owner==='you').length;
     const bot=board.filter(t=>t.owner==='bot').length;
-    const e=$('end'); e.classList.add('show');
-    $('endTitle').textContent = you>bot?'Победа':(you<bot?'Поражение':'Ничья');
-    $('endText').textContent = `Игрок ${you} : ${bot} Соперник`;
+    const won=you>bot;
+    const e=$('end');e.classList.add('show');
+    if(won){
+      level++;
+      localStorage.setItem('duel_level',level);
+      $('endTitle').textContent='Уровень пройден! 🎉';
+      $('endText').textContent=`${you} : ${bot} — вы переходите на уровень ${level}`;
+      $('endNew').textContent=`Уровень ${level} →`;
+    } else if(you===bot){
+      $('endTitle').textContent='Ничья';
+      $('endText').textContent=`${you} : ${bot} — попробуйте ещё раз`;
+      $('endNew').textContent='Попробовать снова';
+    } else {
+      $('endTitle').textContent='Поражение';
+      $('endText').textContent=`${you} : ${bot} — уровень ${level} ещё не покорился`;
+      $('endNew').textContent='Попробовать снова';
+    }
+    render();
     return true;
   }
   return false;
@@ -348,24 +402,33 @@ function checkEnd(){
 function hint(){
   if(turn!=='you'||busy) return;
   const mv=bestMove('you');
-  if(!mv){ setMsg('Нет ходов — пропустите','bad'); return; }
-  sel=mv.tiles.slice(); render();
+  if(!mv){setMsg('Нет ходов — пропустите','bad');return;}
+  sel=mv.tiles.slice();render();
   document.querySelectorAll('.tile.sel').forEach(el=>el.classList.add('hint'));
   setMsg('Подсказка: '+mv.word.toUpperCase(),'good');
 }
 
 /* ---------- старт ---------- */
 function startGame(){
-  board=newBoard(); sel=[]; turn='you'; played=new Set(); passes=0; busy=false;
-  $('youWords').innerHTML=''; $('botWords').innerHTML=''; $('end').classList.remove('show');
-  setMsg(''); render();
+  board=newBoard();sel=[];turn='you';played=new Set();passes=0;busy=false;
+  const bonus=botBonusTiles(level);
+  if(bonus>0){
+    const idxs=[...Array(N).keys()].sort(()=>Math.random()-.5);
+    let given=0;
+    for(const i of idxs){if(given>=bonus)break;board[i].owner='bot';given++;}
+  }
+  $('youWords').innerHTML='';$('botWords').innerHTML='';$('end').classList.remove('show');
+  setMsg('');render();
 }
 
 $('acceptBtn').onclick=youAccept;
 $('clearBtn').onclick=clearSel;
 $('hintBtn').onclick=hint;
 $('passBtn').onclick=pass;
-$('newBtn').onclick=startGame;
+$('resetBtn').onclick=()=>{
+  if(!confirm('Сбросить прогресс до уровня 1?')) return;
+  level=1;localStorage.setItem('duel_level',1);startGame();
+};
 $('endNew').onclick=startGame;
 
 async function loadDict(){
