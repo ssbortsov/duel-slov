@@ -291,7 +291,7 @@ function youAccept(){
   if(turn!=='you'||busy) return;
   const word=sel.map(i=>board[i].ch).join('');
   if(word.length<2){ return; }
-  if(!DICT.has(word)){ setMsg('Нет в словаре прототипа','bad'); shake(); return; }
+  if(!DICT.has(word)){ setMsg('Нет в словаре','bad'); shake(); return; }
   if(!wordAllowed(word)){ setMsg('Слово уже было','bad'); shake(); return; }
   const before=board.filter(t=>t.owner==='you').length;
   applyWord('you', sel.slice(), word);
