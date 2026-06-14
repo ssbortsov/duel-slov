@@ -14,7 +14,7 @@
     --bot:#c95a92; --bot-hi:#ff5f9e; --bot-lock:#ffb3d6;
     --accent:#ff4f8b;
     --good:#4ad6a0; --bad:#ff6b6b;
-    --r:14px; --tile:58px; --gap:7px;
+    --r:12px; --tile:54px; --gap:6px;
     --font: -apple-system, "Segoe UI", Roboto, system-ui, "Helvetica Neue", Arial, sans-serif;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
@@ -49,6 +49,10 @@
     border:1.5px solid var(--accent); color:var(--ink); background:rgba(255,79,139,.08);
     min-width:120px; line-height:1.25}
   .turnpill.you{border-color:var(--you-hi); background:rgba(91,141,239,.10)}
+  .turnpill.urgent{border-color:var(--bad)!important; background:rgba(255,107,107,.12)!important; color:var(--bad)!important}
+  .timerbar{height:3px; border-radius:2px; background:rgba(255,255,255,.08); overflow:hidden; margin-top:-8px}
+  .timerbar__fill{height:100%; background:var(--you-hi); transition:width 1s linear; border-radius:2px}
+  .timerbar.urgent .timerbar__fill{background:var(--bad)}
   .words{margin-top:2px; width:100%; display:flex; flex-direction:column; gap:3px}
   .wrow{display:flex; justify-content:space-between; font-size:11px; font-weight:700;
     background:rgba(255,255,255,.04); padding:3px 8px; border-radius:7px}
@@ -58,7 +62,7 @@
   /* board */
   .board{display:grid; gap:var(--gap); justify-content:center; margin:2px auto 0}
   .tile{width:var(--tile); height:var(--tile); border-radius:var(--r); border:none;
-    font-family:var(--font); font-size:26px; font-weight:800; color:#fff;
+    font-family:var(--font); font-size:22px; font-weight:800; color:#fff;
     display:grid; place-items:center; cursor:pointer; position:relative;
     background:var(--slate); box-shadow:0 3px 0 rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.12);
     transition:transform .08s, background .15s; user-select:none}
@@ -124,6 +128,7 @@
     </div>
   </div>
 
+  <div class="timerbar" id="timerbar"><div class="timerbar__fill" id="timerFill" style="width:100%"></div></div>
   <div class="board" id="board"></div>
 
   <div class="cur" id="cur"><span class="ph">— —</span></div>
@@ -187,7 +192,7 @@ function botAvaChar(lvl) {
 }
 
 /* ---------- конфиг поля ---------- */
-const COLS=5, ROWS=4, N=COLS*ROWS;
+const COLS=5, ROWS=5, N=COLS*ROWS;
 const BAG = (()=>{
   const w={о:11,е:10,а:8,и:7,н:7,т:6,с:6,р:6,в:5,л:5,к:5,п:4,м:4,д:4,у:4,я:2,г:2,з:2,б:2,й:2,х:2,ж:1,ш:1,ц:1,ч:2,ь:2,ы:2,э:1,ф:1,ю:1};
   const arr=[]; for(const k in w){ for(let i=0;i<w[k];i++) arr.push(k);} return arr;
@@ -196,6 +201,8 @@ const VOW = new Set(['а','е','и','о','у','ы','э','ю','я']);
 
 /* ---------- состояние ---------- */
 let board=[], sel=[], turn='you', played=new Set(), passes=0, busy=false;
+let timerId=null, timeLeft=50;
+const TURN_SEC=50;
 const $=id=>document.getElementById(id);
 const neighbors=i=>{const r=(i/COLS)|0,c=i%COLS,o=[];if(r>0)o.push(i-COLS);if(r<ROWS-1)o.push(i+COLS);if(c>0)o.push(i-1);if(c<COLS-1)o.push(i+1);return o;};
 
@@ -207,10 +214,10 @@ function newBoard(){
     const b=[];
     for(let i=0;i<N;i++) b.push({ch:BAG[(Math.random()*BAG.length)|0],owner:null});
     const vowels=b.filter(t=>VOW.has(t.ch)).length;
-    if(vowels<6||vowels>11) continue;
+    if(vowels<8||vowels>14) continue;
     const counts=letterMultiset(b.map(t=>t.ch));
-    let ok=0; for(const w of DICT){if(formable(w,counts)){ok++;if(ok>=14)break;}}
-    if(ok>=14) return b;
+    let ok=0; for(const w of DICT){if(formable(w,counts)){ok++;if(ok>=18)break;}}
+    if(ok>=18) return b;
   }
   return Array.from({length:N},()=>({ch:BAG[(Math.random()*BAG.length)|0],owner:null}));
 }
@@ -281,6 +288,34 @@ function bestMove(player){
   return moves[0];
 }
 
+/* ---------- таймер ---------- */
+function startTimer(){
+  clearTimer();
+  timeLeft=TURN_SEC;
+  updateTimer();
+  timerId=setInterval(()=>{
+    timeLeft--;
+    updateTimer();
+    if(timeLeft<=0){clearTimer();pass();}
+  },1000);
+}
+function clearTimer(){
+  if(timerId){clearInterval(timerId);timerId=null;}
+}
+function updateTimer(){
+  const pct=(timeLeft/TURN_SEC)*100;
+  const fill=$('timerFill');
+  const bar=$('timerbar');
+  if(fill){fill.style.width=pct+'%';}
+  const urgent=timeLeft<=10;
+  if(bar){bar.className='timerbar'+(urgent?' urgent':'');}
+  const tp=$('turnPill');
+  if(tp&&turn==='you'){
+    tp.textContent=`Ваш ход · ${timeLeft}с`;
+    tp.className='turnpill you'+(urgent?' urgent':'');
+  }
+}
+
 /* ---------- отрисовка ---------- */
 function render(){
   const b=$('board');b.style.gridTemplateColumns=`repeat(${COLS},var(--tile))`;
@@ -301,7 +336,7 @@ function render(){
   $('cur').innerHTML=word?word.toUpperCase().split('').join(''):'<span class="ph">— —</span>';
   $('acceptBtn').disabled=!(word.length>=2&&turn==='you'&&!busy);
   const tp=$('turnPill');
-  if(turn==='you'){tp.textContent='Ваш ход';tp.className='turnpill you';}
+  if(turn==='you'){tp.textContent=`Ваш ход · ${timeLeft}с`;tp.className='turnpill you'+(timeLeft<=10?' urgent':'');}
   else{tp.textContent='Соперник ищет слово…';tp.className='turnpill';}
   $('levelLine').textContent=`Уровень ${level}`;
   $('botName').textContent=botTitle(level);
@@ -336,7 +371,7 @@ function youAccept(){
   applyWord('you',sel.slice(),word);
   const gain=board.filter(t=>t.owner==='you').length-before;
   renderWordLog('you',word,Math.max(gain,0));
-  passes=0;sel=[];
+  clearTimer();passes=0;sel=[];
   setMsg('Слово принято','good');
   endTurnTo('bot');
 }
@@ -354,6 +389,7 @@ function shake(){const c=$('cur');c.animate([{transform:'translateX(-6px)'},{tra
 function endTurnTo(who){
   turn=who;render();
   if(who==='bot'){
+    clearTimer();
     busy=true;
     setTimeout(()=>{
       const mv=bestMove('bot');
@@ -365,7 +401,7 @@ function endTurnTo(who){
       } else {passes++;}
       busy=false;
       if(checkEnd()){render();return;}
-      turn='you';setMsg('');render();
+      turn='you';setMsg('');render();startTimer();
     },650);
   }
 }
@@ -373,6 +409,7 @@ function endTurnTo(who){
 function checkEnd(){
   const full=board.every(t=>t.owner!==null);
   if(full||passes>=2){
+    clearTimer();
     const you=board.filter(t=>t.owner==='you').length;
     const bot=board.filter(t=>t.owner==='bot').length;
     const won=you>bot;
@@ -418,7 +455,7 @@ function startGame(){
     for(const i of idxs){if(given>=bonus)break;board[i].owner='bot';given++;}
   }
   $('youWords').innerHTML='';$('botWords').innerHTML='';$('end').classList.remove('show');
-  setMsg('');render();
+  setMsg('');render();startTimer();
 }
 
 $('acceptBtn').onclick=youAccept;
