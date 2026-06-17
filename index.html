@@ -26,9 +26,10 @@
       radial-gradient(120% 80% at 82% 0%, rgba(201,90,146,.22), transparent 55%),
       linear-gradient(180deg,var(--bg-1),var(--bg-0));
     background-attachment:fixed;
-    display:flex; justify-content:center;
+    display:flex; justify-content:center; align-items:flex-start;
     padding:14px 12px 22px; min-height:100%;
   }
+  .page{width:100%; max-width:960px; display:flex; flex-direction:column; align-items:center; gap:0}
   .app{width:100%; max-width:440px; display:flex; flex-direction:column; gap:12px}
 
   .topline{text-align:center; letter-spacing:.14em; font-size:10px; color:var(--ink-dim);
@@ -116,7 +117,7 @@
   .iconBtn:active{transform:scale(.92)}
 
   /* levels tab */
-  .lvl-wrap{width:100%;max-width:440px;padding:0 12px 0;
+  .lvl-wrap{width:100%;max-width:440px;padding:0 12px 0;box-sizing:border-box;
     display:flex;flex-direction:column;gap:14px}
   .lvl-summary{text-align:center;font-size:12px;font-weight:800;
     color:var(--ink-dim);letter-spacing:.1em;text-transform:uppercase}
@@ -137,9 +138,16 @@
   .lvl-cell.locked{background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);
     cursor:default;border-color:transparent}
   .hidden{display:none!important}
+
+  /* small phone fallback */
+  @media(max-width:359px){
+    :root{--tile:56px;--gap:6px;--r:11px}
+    .tile{font-size:23px}
+  }
 </style>
 </head>
 <body>
+<div class="page">
 <div class="app" id="gameTab">
   <div class="topbar">
     <button class="iconBtn active" id="tabGame" onclick="switchTab('game')">🎮</button>
@@ -183,6 +191,7 @@
 <div class="lvl-wrap hidden" id="levelsTab">
   <div class="lvl-summary">Пройдено уровней: <b id="lvlCount">0</b></div>
   <div id="levelsGrid"></div>
+</div>
 </div>
 
 <div class="end" id="end">
