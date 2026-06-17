@@ -185,7 +185,6 @@
   </div>
   <div class="subbar">
     <button class="linkbtn" id="passBtn">Пропустить ход</button>
-    <button class="linkbtn" id="resetBtn">Сбросить уровень</button>
   </div>
 </div>
 
@@ -570,10 +569,6 @@ $('acceptBtn').onclick=youAccept;
 $('clearBtn').onclick=clearSel;
 $('hintBtn').onclick=hint;
 $('passBtn').onclick=pass;
-$('resetBtn').onclick=()=>{
-  if(!confirm('Сбросить прогресс до уровня 1?')) return;
-  level=1;localStorage.setItem('duel_level',1);startGame();
-};
 $('endNew').onclick=startGame;
 
 
