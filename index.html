@@ -14,7 +14,7 @@
     --bot:#c95a92; --bot-hi:#c95a92; --bot-lock:#e89dc0;
     --accent:#ff4f8b;
     --good:#4ad6a0; --bad:#ff6b6b;
-    --r:12px; --tile:54px; --gap:6px;
+    --r:14px; --tile:68px; --gap:8px;
     --font: -apple-system, "Segoe UI", Roboto, system-ui, "Helvetica Neue", Arial, sans-serif;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
@@ -62,7 +62,7 @@
   /* board */
   .board{display:grid; gap:var(--gap); justify-content:center; margin:2px auto 0}
   .tile{width:var(--tile); height:var(--tile); border-radius:var(--r); border:none;
-    font-family:var(--font); font-size:22px; font-weight:800; color:#fff;
+    font-family:var(--font); font-size:28px; font-weight:800; color:#fff;
     display:grid; place-items:center; cursor:pointer; position:relative;
     background:var(--slate); box-shadow:0 3px 0 rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.12);
     transition:transform .08s, background .15s; user-select:none}
@@ -231,7 +231,7 @@ function botAvaChar(lvl) {
 }
 
 /* ---------- конфиг поля ---------- */
-const COLS=5, ROWS=5, N=COLS*ROWS;
+const COLS=4, ROWS=4, N=COLS*ROWS;
 const BAG = (()=>{
   const w={о:11,е:10,а:8,и:7,н:7,т:6,с:6,р:6,в:5,л:5,к:5,п:4,м:4,д:4,у:4,я:2,г:2,з:2,б:2,й:2,х:2,ж:1,ш:1,ц:1,ч:2,ь:2,ы:2,э:1,ф:1,ю:1};
   const arr=[]; for(const k in w){ for(let i=0;i<w[k];i++) arr.push(k);} return arr;
@@ -254,10 +254,10 @@ function newBoard(){
     const b=[];
     for(let i=0;i<N;i++) b.push({ch:BAG[(Math.random()*BAG.length)|0],owner:null});
     const vowels=b.filter(t=>VOW.has(t.ch)).length;
-    if(vowels<8||vowels>14) continue;
+    if(vowels<4||vowels>8) continue;
     const counts=letterMultiset(b.map(t=>t.ch));
-    let ok=0; for(const w of DICT){if(formable(w,counts)){ok++;if(ok>=18)break;}}
-    if(ok>=18) return b;
+    let ok=0; for(const w of DICT){if(formable(w,counts)){ok++;if(ok>=10)break;}}
+    if(ok>=10) return b;
   }
   return Array.from({length:N},()=>({ch:BAG[(Math.random()*BAG.length)|0],owner:null}));
 }
