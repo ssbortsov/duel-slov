@@ -27,7 +27,7 @@
       linear-gradient(180deg,var(--bg-1),var(--bg-0));
     background-attachment:fixed;
     display:flex; justify-content:center;
-    padding:14px 12px 22px; min-height:100%;
+    padding:14px 12px 80px; min-height:100%;
   }
   .app{width:100%; max-width:440px; display:flex; flex-direction:column; gap:12px}
 
@@ -106,10 +106,44 @@
     border:1px solid rgba(255,255,255,.08); border-radius:22px; padding:26px 22px; text-align:center}
   .card h2{margin:0 0 6px; font-size:24px; font-weight:800}
   .card p{margin:0 0 18px; color:var(--ink-dim); font-size:14px; font-weight:700}
+
+  /* tab bar */
+  .tabbar{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--bg-0);
+    border-top:1px solid rgba(255,255,255,.10);z-index:20;
+    padding-bottom:env(safe-area-inset-bottom,0px)}
+  .tabBtn{flex:1;padding:10px 8px 12px;border:none;background:none;
+    font-family:var(--font);font-size:11px;font-weight:800;color:var(--ink-dim);
+    cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;
+    letter-spacing:.06em;text-transform:uppercase}
+  .tabBtn.active{color:var(--you-hi)}
+  .tabBtn .ticon{font-size:20px;line-height:1}
+
+  /* levels tab */
+  .lvl-wrap{width:100%;max-width:440px;padding:16px 12px 0;
+    display:flex;flex-direction:column;gap:14px}
+  .lvl-summary{text-align:center;font-size:12px;font-weight:800;
+    color:var(--ink-dim);letter-spacing:.1em;text-transform:uppercase}
+  .lvl-summary b{color:var(--you-hi);font-size:16px}
+  .lvl-tier{display:flex;flex-direction:column;gap:8px}
+  .lvl-tier-hdr{font-size:11px;font-weight:800;color:var(--ink-dim);
+    letter-spacing:.12em;text-transform:uppercase;padding:2px 0}
+  .lvl-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+  .lvl-cell{aspect-ratio:1;border-radius:12px;border:2px solid transparent;
+    cursor:pointer;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:1px;font-family:var(--font);transition:transform .08s}
+  .lvl-cell:active{transform:scale(.94)}
+  .lvl-cell .lvl-n{font-size:15px;font-weight:800;line-height:1}
+  .lvl-cell .lvl-e{font-size:13px;line-height:1}
+  .lvl-cell.done{background:rgba(61,111,209,.18);color:var(--you-hi)}
+  .lvl-cell.current{background:var(--you);color:#fff;
+    border-color:var(--you-hi);box-shadow:0 0 0 3px rgba(91,141,239,.25)}
+  .lvl-cell.locked{background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);
+    cursor:default;border-color:transparent}
+  .hidden{display:none!important}
 </style>
 </head>
 <body>
-<div class="app">
+<div class="app" id="gameTab">
   <div class="topline" id="levelLine">Уровень 1</div>
 
   <div class="players">
@@ -143,6 +177,11 @@
     <button class="linkbtn" id="passBtn">Пропустить ход</button>
     <button class="linkbtn" id="resetBtn">Сбросить уровень</button>
   </div>
+</div>
+
+<div class="lvl-wrap hidden" id="levelsTab">
+  <div class="lvl-summary">Пройдено уровней: <b id="lvlCount">0</b></div>
+  <div id="levelsGrid"></div>
 </div>
 
 <div class="end" id="end">
@@ -504,6 +543,64 @@ $('resetBtn').onclick=()=>{
 };
 $('endNew').onclick=startGame;
 
+
+/* ---------- вкладки ---------- */
+const TIERS=[
+  {from:1,to:3,title:'Новичок',ava:'🤖'},
+  {from:4,to:6,title:'Любитель',ava:'😐'},
+  {from:7,to:9,title:'Знаток',ava:'🧠'},
+  {from:10,to:14,title:'Мастер',ava:'😎'},
+  {from:15,to:20,title:'Гроссмейстер',ava:'👑'},
+  {from:21,to:Infinity,title:'Легенда',ava:'🔥'},
+];
+
+function switchTab(name){
+  const isGame=name==='game';
+  $('gameTab').classList.toggle('hidden',!isGame);
+  $('levelsTab').classList.toggle('hidden',isGame);
+  $('tabGame').classList.toggle('active',isGame);
+  $('tabLevels').classList.toggle('active',!isGame);
+  if(!isGame) renderLevels();
+}
+
+function renderLevels(){
+  const grid=$('levelsGrid');
+  grid.innerHTML='';
+  $('lvlCount').textContent=level-1;
+  const maxShow=Math.max(level+4, 10);
+  for(const tier of TIERS){
+    if(tier.from>maxShow) break;
+    const section=document.createElement('div');
+    section.className='lvl-tier';
+    const hdr=document.createElement('div');
+    hdr.className='lvl-tier-hdr';
+    hdr.textContent=tier.ava+' '+tier.title;
+    section.appendChild(hdr);
+    const tgrid=document.createElement('div');
+    tgrid.className='lvl-grid';
+    const end=Math.min(tier.to===Infinity?maxShow:tier.to, maxShow);
+    for(let i=tier.from;i<=end;i++){
+      const done=i<level, current=i===level, locked=i>level;
+      const cell=document.createElement('button');
+      cell.className='lvl-cell '+(done?'done':current?'current':'locked');
+      cell.disabled=locked;
+      cell.innerHTML=`<span class="lvl-n">${i}</span><span class="lvl-e">${done?'✓':locked?'🔒':tier.ava}</span>`;
+      if(!locked) cell.onclick=(()=>{const lvl=i;return()=>{
+        level=lvl;localStorage.setItem('duel_level',lvl);
+        switchTab('game');startGame();
+      };})();
+      tgrid.appendChild(cell);
+    }
+    section.appendChild(tgrid);
+    grid.appendChild(section);
+  }
+  // Scroll to current level
+  setTimeout(()=>{
+    const cur=grid.querySelector('.current');
+    if(cur) cur.scrollIntoView({behavior:'smooth',block:'center'});
+  },50);
+}
+
 async function loadDict(){
   setMsg('Загрузка словаря…');
   busy=true;
@@ -518,5 +615,14 @@ async function loadDict(){
 }
 loadDict();
 </script>
+
+<nav class="tabbar">
+  <button class="tabBtn active" id="tabGame" onclick="switchTab('game')">
+    <span class="ticon">🎮</span>Игра
+  </button>
+  <button class="tabBtn" id="tabLevels" onclick="switchTab('levels')">
+    <span class="ticon">🏆</span>Уровни
+  </button>
+</nav>
 </body>
 </html>
