@@ -254,9 +254,9 @@ function dedupRare(b){
 
 /* ---------- состояние ---------- */
 let board=[], sel=[], turn='you', played=new Set(), passes=0, busy=false;
-let timerId=null, timeLeft=50;
+let timerId=null, timeLeft=40;
 let botTimerId=null, botThinkId=null, botVisualLeft=0;
-const TURN_SEC=50;
+const TURN_SEC=40;
 const $=id=>document.getElementById(id);
 const neighbors=i=>{const r=(i/COLS)|0,c=i%COLS,o=[];if(r>0)o.push(i-COLS);if(r<ROWS-1)o.push(i+COLS);if(c>0)o.push(i-1);if(c<COLS-1)o.push(i+1);return o;};
 
