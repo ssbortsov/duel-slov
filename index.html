@@ -505,11 +505,18 @@ function checkEnd(){
     const won=you>bot;
     const e=$('end');e.classList.add('show');
     if(won){
-      level++;
-      localStorage.setItem('duel_level',level);
-      $('endTitle').textContent='Уровень пройден! 🎉';
-      $('endText').textContent=`${you} : ${bot} — вы переходите на уровень ${level}`;
-      $('endNew').textContent=`Уровень ${level} →`;
+      if(level>=50){
+        $('endTitle').textContent='Вы прошли игру! 🏆';
+        $('endText').textContent=`${you} : ${bot} — все 50 уровней пройдены`;
+        $('endNew').textContent='Начать заново';
+        level=1; localStorage.setItem('duel_level',1);
+      } else {
+        level++;
+        localStorage.setItem('duel_level',level);
+        $('endTitle').textContent='Уровень пройден! 🎉';
+        $('endText').textContent=`${you} : ${bot} — вы переходите на уровень ${level}`;
+        $('endNew').textContent=`Уровень ${level} →`;
+      }
     } else if(you===bot){
       $('endTitle').textContent='Ничья';
       $('endText').textContent=`${you} : ${bot} — попробуйте ещё раз`;
@@ -566,7 +573,7 @@ const TIERS=[
   {from:7,to:9,title:'Знаток',ava:'🧠'},
   {from:10,to:14,title:'Мастер',ava:'😎'},
   {from:15,to:20,title:'Гроссмейстер',ava:'👑'},
-  {from:21,to:Infinity,title:'Легенда',ava:'🔥'},
+  {from:21,to:50,title:'Легенда',ava:'🔥'},
 ];
 
 function switchTab(name){
@@ -581,8 +588,8 @@ function switchTab(name){
 function renderLevels(){
   const grid=$('levelsGrid');
   grid.innerHTML='';
-  $('lvlCount').textContent=level-1;
-  const maxShow=Math.max(level+4, 10);
+  $('lvlCount').textContent=`${level-1} / 50`;
+  const maxShow=50;
   for(const tier of TIERS){
     if(tier.from>maxShow) break;
     const section=document.createElement('div');
