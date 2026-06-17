@@ -237,6 +237,20 @@ const BAG = (()=>{
   const arr=[]; for(const k in w){ for(let i=0;i<w[k];i++) arr.push(k);} return arr;
 })();
 const VOW = new Set(['а','е','и','о','у','ы','э','ю','я']);
+const RARE = new Set(['й','ю','э','ь','ъ','ы','ф','ж']);
+
+function dedupRare(b){
+  const seen=new Set();
+  for(let i=0;i<b.length;i++){
+    const ch=b[i].ch;
+    if(RARE.has(ch)){
+      if(seen.has(ch)){
+        let r; do{ r=BAG[(Math.random()*BAG.length)|0]; }while(RARE.has(r));
+        b[i].ch=r;
+      } else { seen.add(ch); }
+    }
+  }
+}
 
 /* ---------- состояние ---------- */
 let board=[], sel=[], turn='you', played=new Set(), passes=0, busy=false;
@@ -253,6 +267,7 @@ function newBoard(){
   for(let tries=0;tries<60;tries++){
     const b=[];
     for(let i=0;i<N;i++) b.push({ch:BAG[(Math.random()*BAG.length)|0],owner:null});
+    dedupRare(b);
     const vowels=b.filter(t=>VOW.has(t.ch)).length;
     if(vowels<4||vowels>8) continue;
     const counts=letterMultiset(b.map(t=>t.ch));
