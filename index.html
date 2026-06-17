@@ -21,11 +21,7 @@
   html,body{margin:0; height:100%}
   body{
     font-family:var(--font); color:var(--ink);
-    background:
-      radial-gradient(120% 80% at 18% 0%, rgba(61,111,209,.20), transparent 55%),
-      radial-gradient(120% 80% at 82% 0%, rgba(201,90,146,.22), transparent 55%),
-      linear-gradient(180deg,var(--bg-1),var(--bg-0));
-    background-attachment:fixed;
+    background:#EF3124;
     display:flex; justify-content:center; align-items:flex-start;
     padding:14px 12px 22px; min-height:100%;
   }
@@ -63,9 +59,9 @@
   /* board */
   .board{display:grid; gap:var(--gap); justify-content:center; margin:2px auto 0}
   .tile{width:var(--tile); height:var(--tile); border-radius:var(--r); border:none;
-    font-family:var(--font); font-size:28px; font-weight:800; color:#fff;
+    font-family:var(--font); font-size:28px; font-weight:800; color:#111;
     display:grid; place-items:center; cursor:pointer; position:relative;
-    background:var(--slate); box-shadow:0 3px 0 rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.12);
+    background:#ffffff; box-shadow:0 3px 0 rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.60);
     transition:transform .08s, background .15s; user-select:none}
   .tile:active{transform:translateY(1px)}
   .tile.you{background:var(--you)} .tile.bot{background:var(--bot)}
