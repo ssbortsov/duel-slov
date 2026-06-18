@@ -141,6 +141,23 @@
     :root{--tile:56px;--gap:6px;--r:11px}
     .tile{font-size:23px}
   }
+
+  /* onboarding */
+  .onboard{position:fixed;inset:0;background:rgba(10,8,20,.92);
+    display:none;place-items:center;padding:24px;z-index:40}
+  .onboard.show{display:grid}
+  .ob-card{width:100%;max-width:320px;background:linear-gradient(180deg,#2c2247,#1e1a35);
+    border:1px solid rgba(255,255,255,.10);border-radius:24px;
+    padding:28px 22px 22px;text-align:center;display:flex;flex-direction:column;gap:14px}
+  .ob-dots{display:flex;justify-content:center;gap:7px;margin-bottom:2px}
+  .ob-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.18);
+    transition:background .25s,transform .25s}
+  .ob-dot.active{background:var(--you-hi);transform:scale(1.3)}
+  .ob-icon{font-size:52px;line-height:1.1}
+  .ob-title{margin:0;font-size:21px;font-weight:800;color:var(--ink)}
+  .ob-body{margin:0;color:var(--ink-dim);font-size:14px;font-weight:600;line-height:1.55}
+  .ob-btns{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:6px}
+  .ob-btns .btn{flex:1}
 </style>
 </head>
 <body>
@@ -625,6 +642,45 @@ function renderLevels(){
   },50);
 }
 
+
+/* ---------- онбординг ---------- */
+const OB_STEPS=[
+  {icon:'👋',title:'Дуэль слов',body:'Игра слов и территорий. Захватывайте клетки — и победите соперника!'},
+  {icon:'🔤',title:'Составляйте слова',body:'Нажимайте на буквы на поле в любом порядке, чтобы составить слово, затем нажмите «Принять».'},
+  {icon:'🟣',title:'Захватывайте клетки',body:'Все буквы принятого слова переходят в ваш цвет. Чем больше букв в слове — тем больше клеток.'},
+  {icon:'⚔️',title:'Отвоёвывайте территорию',body:'Соперник делает то же самое. Включайте его буквы в свои слова — и они перейдут к вам!'},
+  {icon:'🏆',title:'Цель игры',body:'Когда все клетки закрашены — подсчёт. Кто захватил больше клеток — тот и победил.'},
+  {icon:'⏱️',title:'40 секунд на ход',body:'Не успели составить слово — ход пропускается автоматически. Думайте быстро!'},
+  {icon:'📈',title:'50 уровней',body:'С каждым уровнем соперник умнеет. Пройдите все 50, чтобы стать чемпионом!'},
+];
+let obStep=0;
+
+function showOnboarding(){
+  obStep=0; renderObStep();
+  $('onboard').classList.add('show');
+}
+function renderObStep(){
+  const s=OB_STEPS[obStep];
+  $('obIcon').textContent=s.icon;
+  $('obTitle').textContent=s.title;
+  $('obBody').textContent=s.body;
+  $('obNext').textContent=obStep===OB_STEPS.length-1?'Начать игру!':'Далее →';
+  const dots=$('obDots'); dots.innerHTML='';
+  OB_STEPS.forEach((_,i)=>{
+    const d=document.createElement('span');
+    d.className='ob-dot'+(i===obStep?' active':'');
+    dots.appendChild(d);
+  });
+}
+function obAdvance(){
+  if(obStep<OB_STEPS.length-1){obStep++;renderObStep();}
+  else closeOnboarding();
+}
+function closeOnboarding(){
+  $('onboard').classList.remove('show');
+  localStorage.setItem('duel_onboarded','1');
+}
+
 async function loadDict(){
   setMsg('Загрузка словаря…');
   busy=true;
@@ -636,9 +692,23 @@ async function loadDict(){
     setMsg('Ошибка загрузки словаря','bad');
   }
   startGame();
+  if(!localStorage.getItem('duel_onboarded')) showOnboarding();
 }
 loadDict();
 </script>
+
+<div class="onboard" id="onboard">
+  <div class="ob-card">
+    <div class="ob-dots" id="obDots"></div>
+    <div class="ob-icon" id="obIcon"></div>
+    <h2 class="ob-title" id="obTitle"></h2>
+    <p class="ob-body" id="obBody"></p>
+    <div class="ob-btns">
+      <button class="btn ghost" id="obSkip" onclick="closeOnboarding()">Пропустить</button>
+      <button class="btn accept" id="obNext" onclick="obAdvance()">Далее →</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
